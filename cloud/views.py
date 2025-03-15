@@ -1,8 +1,12 @@
 import zipfile
+import logging
 
 from django.http import FileResponse, JsonResponse, Http404
 
 from .models import UploadFile
+
+
+logger = logging.getLogger(__name__)
 
 
 def upload_file(request):
@@ -18,6 +22,7 @@ def upload_file(request):
 
 def file_list(request):
     files = UploadFile.objects.all().values('pk', 'original_name')
+    logger.debug("업로드 파일 목록 조회")
     return JsonResponse({'files': list(files)})
 
 
