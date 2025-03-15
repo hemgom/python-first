@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Cloud</title>
+</head>
+<body>
+    <h1>File Upload</h1>
+    <input type="file" id="inputFile">
+    <button id="fileUploadButton">업로드</button>
+
+    <h1>Uploaded File List</h1>
+    <div id="upload-file-list"></div>
+
+    <script>
+        document.getElementById('fileUploadButton').addEventListener('click', function () {
+            const inputFile = document.getElementById('inputFile');
+            const formData = new FormData();
+            formData.append('file', inputFile.files[0]);
+
+            fetch('/upload/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    loadFileList();
+                })
+                .catch(error => console.error('Error : ', error));
+        });
+
+        function  loadFileList() {
+            fetch('/file-list/')
+                .then(response => response.json())
+                .then(data => {
+                    const fileListDiv = document.getElementById('upload-file-list');
+                    fileListDiv.innerHTML = '';
+                    data.files.forEach(file => {
+                        const p = document.createElement('p');
+
+                        const icon = document.createElement('img');
+                        icon.src = getFileIcon(file.original_name);
+                        icon.alt = 'File Icon';
+                        icon.style.width = '20px';
+                        icon.style.height = '20px';
+                        icon.style.marginRight = '5px';
+                        p.appendChild(icon);
+
+                        p.appendChild(document.createTextNode(file.original_name));
+
+                        const downloadButton = document.createElement('button');
+                        downloadButton.textContent = '다운로드';
+                        downloadButton.onclick = function () {
+                            window.location.href = `/download/${file.pk}/`;
+                        };
+                        p.appendChild(downloadButton);
+
+                        const extension = file.original_name.split('.').pop().toLowerCase();
+                        if (['zip', 'rar', 'tar', 'gz'].includes(extension)) {
+                            const compressionFileContentsButton = document.createElement('button');
+                            compressionFileContentsButton.textContent = '압축파일 내용 확인';
+                            compressionFileContentsButton.onclick = function () {
+                                fetch(`/compression-file-contents/${file.pk}`)
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (data.files) {
+                                            alert('파일 목록 : ' + data.files.join(', '));
+                                        } else {
+                                            alert(data.error);
+                                        }
+                                    })
+                                    .catch(error => console.error('error : ', error));
+                            };
+                            p.appendChild(compressionFileContentsButton);
+                        }
+
+                        fileListDiv.appendChild(p);
+                    });
+                });
+        }
+
+        function getFileIcon(fileName) {
+            const extension = fileName.split('.').pop().toLowerCase();
+            switch (extension) {
+                case 'zip':
+                    return 'static/cloud/img/icons/zip.png';
+                default:
+                    return 'static/cloud/img/icons/default.png';
+            }
+        }
+
+        window.onload = loadFileList;
+    </script>
+</body>
+</html>
