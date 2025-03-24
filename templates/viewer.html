@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Cloud</title>
+</head>
+<body>
+    <h1>File Upload</h1>
+    <input type="file" id="uploadFile">
+    <button id="fileUploadButton">열기</button>
+
+    <h3>=======================</h3>
+
+    <h1>File List</h1>
+    <h2 id="fileName"></h2>
+    <div id="fileList"></div>
+
+    <script>
+        document.getElementById('fileUploadButton').addEventListener('click', function () {
+           const uploadFile = document.getElementById('uploadFile');
+           const formData = new FormData();
+           formData.append('file', uploadFile.files[0]);
+
+           fetch('/viewer/upload/', {
+               method: 'POST',
+               body: formData,
+               headers: {
+                   'X-CSRFToken': '{{ csrf_token }}'
+               }
+           })
+               .then(response => response.json())
+               .then(data => {
+                   console.log(data);
+                   readFileName(data.zip_name);
+                   readFileList(data.zip_structure.root);
+               })
+               .catch(error => console.error('Error: ', error));
+        });
+
+        function readFileName(uploadedFileName) {
+            const fileName = document.getElementById('fileName');
+            fileName.textContent = "Open File: " + uploadedFileName;
+        }
+
+        function readFileList(zipContents) {
+            const filesInfo = document.getElementById('fileList');
+            filesInfo.innerHTML = '';
+            zipContents.forEach(item => {
+                if (item.is_dir) {
+                    const dirElement = document.createElement('div');
+                    dirElement.textContent = `● ${item.dir_name}/`;
+                    filesInfo.appendChild(dirElement);
+
+                    const fileList = document.createElement('div');
+                    fileList.style.marginLeft = '15px';
+                    appendContents(fileList, item.contents, 1);
+                    filesInfo.appendChild(fileList);
+
+                } else {
+                    const fileElement = document.createElement('div');
+                    fileElement.textContent = `● ${item.file_name}`;
+                    filesInfo.appendChild(fileElement);
+                }
+            });
+        }
+
+        function appendContents(container, contents, level) {
+            contents.forEach(item => {
+                if (item.is_dir) {
+                    const dirElement = document.createElement('div');
+                    dirElement.textContent = `┗ ${item.dir_name}/`;
+                    container.appendChild(dirElement);
+
+                    const subFileList = document.createElement('div');
+                    subFileList.style.marginLeft = `${15 * (level + 1)}px`;
+                    appendContents(subFileList, item.contents, level + 1);
+                    container.appendChild(subFileList);
+
+                } else {
+                    const fileElement = document.createElement('div');
+                    fileElement.textContent = `┗ ${item.file_name}`;
+                    container.appendChild(fileElement);
+                }
+            });
+        }
+
+        window.onload = readFileList;
+    </script>
+</body>
+</html>
