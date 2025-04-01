@@ -5,86 +5,250 @@
     <title>Test Cloud</title>
 </head>
 <body>
-    <h1>File Upload</h1>
-    <input type="file" id="uploadFile">
-    <button id="fileUploadButton">열기</button>
+<h1>File Upload</h1>
+<input type="file" id="uploadFile">
+<button id="fileUploadButton">열기</button>
 
-    <h3>=======================</h3>
+<h3>=======================</h3>
 
-    <h1>File List</h1>
-    <h2 id="fileName"></h2>
-    <div id="fileList"></div>
+<h1>File List</h1>
+<h2 id="fileName"></h2>
+<div id="fileList"></div>
 
-    <script>
-        document.getElementById('fileUploadButton').addEventListener('click', function () {
-           const uploadFile = document.getElementById('uploadFile');
-           const formData = new FormData();
-           formData.append('file', uploadFile.files[0]);
+<h3>=======================</h3>
 
-           fetch('/viewer/upload/', {
-               method: 'POST',
-               body: formData,
-               headers: {
-                   'X-CSRFToken': '{{ csrf_token }}'
-               }
-           })
-               .then(response => response.json())
-               .then(data => {
-                   console.log(data);
-                   readFileName(data.zip_name);
-                   readFileList(data.zip_structure.root);
-               })
-               .catch(error => console.error('Error: ', error));
+<h1>History List</h1>
+<div>
+    <label for="searchFileName">검색 파일:</label>
+    <input type="text" id="searchFileName" placeholder="파일명 검색">
+
+    <label for="searchDate">날짜:</label>
+    <input type="date" id="searchDate">
+
+    <button id="historyButton">사용 기록 조회</button>
+</div>
+
+<table id="history-table" border="1">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>압축파일명</th>
+        <th>압축파일 크기</th>
+        <th>사용 시간</th>
+    </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<div id="pagination">
+    <button id="prevPage" disabled>이전 페이지</button>
+    <span id="pageInfo"></span>
+    <button id="nextPage" disabled>다음 페이지</button>
+</div>
+
+<script>
+    let currentPage = 1;
+    let totalPage = 1;
+
+    document.getElementById('historyButton').addEventListener('click', function () {
+        fetchData(currentPage);
+    });
+
+    document.getElementById('prevPage').addEventListener('click', function () {
+        if (currentPage > 1) {
+            currentPage--;
+            fetchData(currentPage);
+        }
+    });
+
+    document.getElementById('nextPage').addEventListener('click', function () {
+        if (currentPage < totalPage) {
+            currentPage++;
+            fetchData(currentPage);
+        }
+    });
+
+    function fetchData(page) {
+        const fileName = document.getElementById("searchFileName").value;
+        const createdAt = document.getElementById("searchDate").value;
+
+        let requestUrl = `/viewer/history/?page=${page}`;
+
+        if (fileName) {
+            requestUrl += `&file_name=${encodeURIComponent(fileName)}`;
+        }
+        if (createdAt) {
+            requestUrl += `&created_at=${encodeURIComponent(createdAt)}`;
+        }
+
+        fetch(requestUrl, {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                totalPage = data.total_pages;
+                updateTable(data.histories);
+                updatePagination();
+            })
+            .catch(error => console.error('Error: ', error));
+    }
+
+    function updateTable(data) {
+        const tableBody = document.querySelector("#history-table tbody");
+        tableBody.innerHTML = '';
+
+        data.forEach(item => {
+            const row = document.createElement("tr");
+
+            row.innerHTML = `
+                            <td>${item.id}</td>
+                            <td>${item.file_name}</td>
+                            <td>${item.file_size}</td>
+                            <td>${item.created_at}</td>
+                            <td><button class="edit-button" data-id="${item.id}">수정</button</td>
+                            <td><button class="del-button" data-id="${item.id}">삭제</button</td>
+                        `;
+
+            tableBody.appendChild(row);
         });
 
-        function readFileName(uploadedFileName) {
-            const fileName = document.getElementById('fileName');
-            fileName.textContent = "Open File: " + uploadedFileName;
-        }
-
-        function readFileList(zipContents) {
-            const filesInfo = document.getElementById('fileList');
-            filesInfo.innerHTML = '';
-            zipContents.forEach(item => {
-                if (item.is_dir) {
-                    const dirElement = document.createElement('div');
-                    dirElement.textContent = `● ${item.dir_name}/`;
-                    filesInfo.appendChild(dirElement);
-
-                    const fileList = document.createElement('div');
-                    fileList.style.marginLeft = '15px';
-                    appendContents(fileList, item.contents, 1);
-                    filesInfo.appendChild(fileList);
-
-                } else {
-                    const fileElement = document.createElement('div');
-                    fileElement.textContent = `● ${item.file_name}`;
-                    filesInfo.appendChild(fileElement);
-                }
+        const editButtons = document.querySelectorAll('.edit-button');
+        editButtons.forEach(button => {
+            button.addEventListener('click', function (e) {
+                const id = e.target.getAttribute('data-id');
+                editHistory(id);
             });
-        }
+        });
 
-        function appendContents(container, contents, level) {
-            contents.forEach(item => {
-                if (item.is_dir) {
-                    const dirElement = document.createElement('div');
-                    dirElement.textContent = `┗ ${item.dir_name}/`;
-                    container.appendChild(dirElement);
-
-                    const subFileList = document.createElement('div');
-                    subFileList.style.marginLeft = `${15 * (level + 1)}px`;
-                    appendContents(subFileList, item.contents, level + 1);
-                    container.appendChild(subFileList);
-
-                } else {
-                    const fileElement = document.createElement('div');
-                    fileElement.textContent = `┗ ${item.file_name}`;
-                    container.appendChild(fileElement);
-                }
+        const delButtons = document.querySelectorAll('.del-button');
+        delButtons.forEach(button => {
+            button.addEventListener('click', function (e) {
+                const id = e.target.getAttribute('data-id');
+                delHistory(id);
             });
-        }
+        });
+    }
 
-        window.onload = readFileList;
-    </script>
+    function updatePagination() {
+        document.getElementById('prevPage').disabled = (currentPage === 1);
+        document.getElementById('nextPage').disabled = (currentPage === totalPage);
+        document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPage}`;
+    }
+
+    function editHistory(id) {
+        const newFileName = prompt("변경할 파일명을 입력");
+        if (newFileName) {
+            fetch(`/viewer/history/${id}/`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    file_name: newFileName
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('수정 데이터:', data);
+                    alert('수정 완료');
+                    document.getElementById('historyButton').click();
+                })
+                .catch(error => console.error('Error: ', error));
+        }
+    }
+
+    function delHistory(id) {
+        const confirmDel = confirm("삭제하겠습니까?");
+        if (confirmDel) {
+            fetch(`/viewer/history/${id}/`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            })
+                .then(response => {
+                    if (response.ok) {
+                        alert("삭제 완료");
+                        document.getElementById('historyButton').click();
+                    }
+                })
+                .catch(error => console.error('Error: ', error));
+        }
+    }
+
+    document.getElementById('fileUploadButton').addEventListener('click', function () {
+        const uploadFile = document.getElementById('uploadFile');
+        const formData = new FormData();
+        formData.append('file', uploadFile.files[0]);
+
+        fetch('/viewer/upload/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+                readFileName(data.zip_name);
+                readFileList(data.zip_structure.root);
+            })
+            .catch(error => console.error('Error: ', error));
+    });
+
+    function readFileName(uploadedFileName) {
+        const fileName = document.getElementById('fileName');
+        fileName.textContent = "Open File: " + uploadedFileName;
+    }
+
+    function readFileList(zipContents) {
+        const filesInfo = document.getElementById('fileList');
+        filesInfo.innerHTML = '';
+        zipContents.forEach(item => {
+            if (item.is_dir) {
+                const dirElement = document.createElement('div');
+                dirElement.textContent = `● ${item.dir_name}/`;
+                filesInfo.appendChild(dirElement);
+
+                const fileList = document.createElement('div');
+                fileList.style.marginLeft = '15px';
+                appendContents(fileList, item.contents, 1);
+                filesInfo.appendChild(fileList);
+
+            } else {
+                const fileElement = document.createElement('div');
+                fileElement.textContent = `● ${item.file_name}`;
+                filesInfo.appendChild(fileElement);
+            }
+        });
+    }
+
+    function appendContents(container, contents, level) {
+        contents.forEach(item => {
+            if (item.is_dir) {
+                const dirElement = document.createElement('div');
+                dirElement.textContent = `┗ ${item.dir_name}/`;
+                container.appendChild(dirElement);
+
+                const subFileList = document.createElement('div');
+                subFileList.style.marginLeft = `${15 * (level + 1)}px`;
+                appendContents(subFileList, item.contents, level + 1);
+                container.appendChild(subFileList);
+
+            } else {
+                const fileElement = document.createElement('div');
+                fileElement.textContent = `┗ ${item.file_name}`;
+                container.appendChild(fileElement);
+            }
+        });
+    }
+
+    window.onload = readFileList;
+</script>
 </body>
 </html>
