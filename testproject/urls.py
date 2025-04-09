@@ -7,8 +7,7 @@ from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 
 from cloud.views import upload_file, file_list, download_file, compression_file_contents
-from viewer.views import ZipViewerPost, ZipViewerGet, ZipViewerPatch
-
+from viewer.views import ZipViewer, ZipViewerDetail
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -30,9 +29,9 @@ urlpatterns = [
 
     # app: viewer
     path('viewer/', TemplateView.as_view(template_name='viewer.html'), name='viewer_page'),
-    path('viewer/upload/', ZipViewerPost.as_view(), name='read_zip'),
-    path('viewer/history/', ZipViewerGet.as_view(), name='get_viewer_history'),
-    path('viewer/history/<int:pk>/', ZipViewerPatch.as_view(), name='edit_viewer_history'),
+    path('viewer/upload/', ZipViewer.as_view(), name='read_zip'),
+    path('viewer/history/', ZipViewerDetail.as_view(), name='get_viewer_history'),
+    path('viewer/history/<int:pk>/', ZipViewerDetail.as_view(), name='edit_viewer_history'),
 
     # swagger
     path('swagger.json/', schema_view.without_ui(cache_timeout=0), name='schema-json'),

@@ -1,19 +1,23 @@
 import os
 import zipfile
-from datetime import datetime
 
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import mixins, status, generics
+from rest_framework.filters import OrderingFilter
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 
+from .filters import ViewerHistoryFilter
 from .models import ViewerHistory
 from .pagination import CustomPagination
 from .serializer import ViewerHistorySerializer
 
 
-class ZipViewerPost(mixins.CreateModelMixin, generics.GenericAPIView):
+class ZipViewer(mixins.CreateModelMixin, generics.GenericAPIView):
+    queryset = ViewerHistory.objects.all()
+    serializer_class = ViewerHistorySerializer
     parser_classes = (MultiPartParser, FormParser)
 
     @swagger_auto_schema(
@@ -92,9 +96,15 @@ class ZipViewerPost(mixins.CreateModelMixin, generics.GenericAPIView):
 
         return zip_structure
 
-class ZipViewerGet(mixins.ListModelMixin, generics.GenericAPIView):
-    serializer_class = ViewerHistorySerializer    # 직렬화 할 serializer 클래스 설정
+
+class ZipViewerDetail(mixins.ListModelMixin, mixins.UpdateModelMixin,
+                      mixins.DestroyModelMixin, generics.GenericAPIView):
+    queryset = ViewerHistory.objects.all()
+    serializer_class = ViewerHistorySerializer
     pagination_class = CustomPagination
+
+    filter_backends = (DjangoFilterBackend, OrderingFilter)
+    filterset_class = ViewerHistoryFilter
 
     @swagger_auto_schema(
         operation_description="구조를 읽은 압축파일 메타정보 목록을 조회합니다.",
@@ -109,33 +119,7 @@ class ZipViewerGet(mixins.ListModelMixin, generics.GenericAPIView):
         ]
     )
     def get(self, request, *args, **kwargs):
-        file_name = request.GET.get('file_name', None)
-        created_at = request.GET.get('created_at', None)
-        histories = ViewerHistory.objects.all()
-
-        if file_name:
-            histories = histories.filter(file_name__icontains=file_name)
-        if created_at:
-            try:
-                valid_created_at = datetime.strptime(created_at, '%Y-%m-%d').date()
-                histories = histories.filter(created_at__gte=valid_created_at)
-            except ValueError as e:
-                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-        page = self.paginate_queryset(histories)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(histories, many=True)
-        return Response(serializer.data)
-
-class ZipViewerPatch(mixins.UpdateModelMixin,
-                     mixins.DestroyModelMixin,
-                     generics.GenericAPIView):
-    queryset = ViewerHistory.objects.all()
-    serializer_class = ViewerHistorySerializer    # 직렬화 할 serializer 클래스 설정
-    pagination_class = CustomPagination
+        return self.list(request, *args, **kwargs)
 
     @swagger_auto_schema(
         operation_description="조회한 압축파일의 파일명을 수정합니다.",
