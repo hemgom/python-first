@@ -2,6 +2,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path
 from django.views.generic import TemplateView
+from django.contrib import admin
 
 from cloud.views import upload_file, file_list, download_file, compression_file_contents
 
@@ -11,4 +12,7 @@ urlpatterns = [
     path('file-list/', file_list, name='file_list'),
     path('download/<int:pk>/', download_file, name='download_file'),
     path('compression-file-contents/<int:pk>/', compression_file_contents, name='compression_file_contents'),
+
+    # ap
+    path('admin/', admin.site.urls),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
